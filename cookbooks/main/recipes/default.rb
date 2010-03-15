@@ -4,7 +4,9 @@ execute "testing" do
   }
 end
 
-require_recipe 'postgres'
+require_recipe 'mongodb'
+
+#require_recipe 'postgres'
 
 # uncomment if you want to run couchdb recipe
 # require_recipe "couchdb"
