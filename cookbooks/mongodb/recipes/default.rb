@@ -56,6 +56,7 @@ if ['db_master','db_slave','solo'].include?(node[:instance_role])
     owner "root"
     group "root"
     mode 0755
+    source "mongodb-master.conf" if node[:instance_role] == 'solo'
     source "mongodb-master.conf" if node[:instance_role] == 'db_master'
     source "mongodb-slave.conf" if node[:instance_role] == 'db_slave'    
     backup false
