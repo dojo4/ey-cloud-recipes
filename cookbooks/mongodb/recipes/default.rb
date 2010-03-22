@@ -6,7 +6,7 @@
 # NOTE: Be sure to edit files/default/mongodb-slave.conf
 # If you plan on using replication with a database slave
 
-if ['db_master','db_slave'].include?(node[:instance_role])
+if ['db_master','db_slave','solo'].include?(node[:instance_role])
   package "dev-db/mongodb-bin" do
     action :install
   end
