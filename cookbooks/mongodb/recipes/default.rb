@@ -1,60 +1,98 @@
 #
 # Cookbook Name:: mongodb
 # Recipe:: default
- 
- 
-directory "/data/master" do
-  owner node[:owner_name]
-  group node[:owner_name]
-  mode 0755
-  recursive true
-  not_if { File.directory?('/data/master') }
-end
- 
-# The recipe is not using a slave yet but it will create the directory
-# so that it is there for the future
-directory "/data/slave" do
-  owner node[:owner_name]
-  group node[:owner_name]
-  mode 0755
-  recursive true
-  not_if { File.directory?('/data/slave') }
-end
+#
+
+# NOTE: Be sure to edit files/default/mongodb-slave.conf
+# If you plan on using replication with a database slave
+
+if ['db_master','db_slave'].include?(node[:instance_role])
+  package "dev-db/mongodb-bin" do
+    action :install
+  end
   
-execute "install-mongodb" do
-  command %Q{
-curl -O http://downloads.mongodb.org/linux/mongodb-linux-i686-latest.tgz &&
-mkdir /usr/local/mongodb &&
-tar -xvvf mongodb-linux-i686-latest.tgz -C /usr/local/mongodb --strip 1 &&
-rm mongodb-linux-i686-latest.tgz
-}
-  not_if { File.directory?('/usr/local/mongodb') }
-end
+  directory '/db/mongodb/master-data' do
+    owner 'mongodb'
+    group 'mongodb'
+    mode  '0755'
+    action :create
+    recursive true
+  end
+
+  directory '/db/mongodb/slave-data' do
+    owner 'mongodb'
+    group 'mongodb'
+    mode  '0755'
+    action :create
+    recursive true
+  end
   
-execute "add-to-path" do
-  command %Q{
-echo 'export PATH=$PATH:/usr/local/mongodb/bin' >> /etc/profile
-}
-  not_if "grep 'export PATH=$PATH:/usr/local/mongodb/bin' /etc/profile"
-end
+  directory '/var/log/mongodb' do
+    owner 'mongodb'
+    group 'mongodb'
+    mode '0755'
+    action :create
+    recursive true
+  end
   
-remote_file "/etc/init.d/mongodb" do
-  source "mongodb"
-  owner "root"
-  group "root"
-  mode 0755
-end
- 
-execute "add-mongodb-to-default-run-level" do
-  command %Q{
-rc-update add mongodb default
-}
-  not_if "rc-status | grep mongodb"
-end
- 
-execute "ensure-mongodb-is-running" do
-  command %Q{
-/etc/init.d/mongodb start
-}
-  not_if "pgrep mongod"
+  directory '/var/run/mongodb' do
+    owner 'mongodb'
+    group 'mongodb'
+    mode '0755'
+    action :create
+    recursive true
+  end  
+  
+  remote_file "/etc/logrotate.d/mongodb" do
+    owner "root"
+    group "root"
+    mode 0755
+    source "mongodb.logrotate"
+    backup false
+    action :create
+  end
+  
+  remote_file "/etc/conf.d/mongodb" do
+    owner "root"
+    group "root"
+    mode 0755
+    source "mongodb-master.conf" if node[:instance_role] == 'db_master'
+    source "mongodb-slave.conf" if node[:instance_role] == 'db_slave'    
+    backup false
+    action :create
+  end  
+  
+  execute "enable-mongodb" do
+    command "rc-update add mongodb default"
+    action :run
+  end  
+  
+  execute "start-mongodb" do
+    command "/etc/init.d/mongodb restart"
+    action :run
+    not_if "/etc/init.d/mongodb status | grep started"
+  end  
+  
+  node[:applications].each do |app_name,data|
+    user = node[:users].first
+    db_name = "#{app_name}_#{node[:environment][:framework_env]}"
+    
+    execute "create-mongodb-root-user" do
+      command "/usr/bin/mongo admin --eval 'db.addUser(\"root\",\"#{user[:password]}\")'"
+      action :run
+      not_if "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\")' | grep ^1$"
+    end    
+    
+    execute "create-mongodb-replication-user" do
+      command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"local\").addUser(\"repl\",\"#{user[:password]}\")'"      
+      action :run
+      not_if "/usr/bin/mongo local --eval 'db.auth(\"repl\",\"#{user[:password]}\")' | grep ^1$"      
+    end
+
+    execute "create-mongodb-application-users" do
+      command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"#{db_name}\").addUser(\"#{user[:username]}\",\"#{user[:password]}\")'"      
+      action :run
+      not_if "/usr/bin/mongo #{db_name} --eval 'db.auth(\"#{user[:username]}\",\"#{user[:password]}\")' | grep ^1$"
+    end    
+  end
 end
