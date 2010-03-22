@@ -78,22 +78,22 @@ if ['db_master','db_slave','solo'].include?(node[:instance_role])
     user = node[:users].first
     db_name = "#{app_name}_#{node[:environment][:framework_env]}"
     
- #   execute "create-mongodb-root-user" do
- #     command "/usr/bin/mongo admin --eval 'db.addUser(\"root\",\"#{user[:password]}\")'"
- #     action :run
- #     not_if "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\")' | grep ^1$"
- #   end    
-    
- #   execute "create-mongodb-replication-user" do
- #     command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"local\").addUser(\"repl\",\"#{user[:password]}\")'"      
- #     action :run
- #     not_if "/usr/bin/mongo local --eval 'db.auth(\"repl\",\"#{user[:password]}\")' | grep ^1$"      
- #   end
+    execute "create-mongodb-root-user" do
+      command "/usr/bin/mongo admin --eval 'db.addUser(\"root\",\"#{user[:password]}\")'"
+      action :run
+      not_if "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\")' | grep ^1$"
+    end    
+   
+    execute "create-mongodb-replication-user" do
+      command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"local\").addUser(\"repl\",\"#{user[:password]}\")'"      
+      action :run
+      not_if "/usr/bin/mongo local --eval 'db.auth(\"repl\",\"#{user[:password]}\")' | grep ^1$"      
+    end
 
- #   execute "create-mongodb-application-users" do
- #     command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"#{db_name}\").addUser(\"#{user[:username]}\",\"#{user[:password]}\")'"      
- #     action :run
- #     not_if "/usr/bin/mongo #{db_name} --eval 'db.auth(\"#{user[:username]}\",\"#{user[:password]}\")' | grep ^1$"
- #   end    
+    execute "create-mongodb-application-users" do
+      command "/usr/bin/mongo admin --eval 'db.auth(\"root\",\"#{user[:password]}\"); db.getMongo().getDB(\"#{db_name}\").addUser(\"#{user[:username]}\",\"#{user[:password]}\")'"      
+      action :run
+      not_if "/usr/bin/mongo #{db_name} --eval 'db.auth(\"#{user[:username]}\",\"#{user[:password]}\")' | grep ^1$"
+    end    
   end
 end
